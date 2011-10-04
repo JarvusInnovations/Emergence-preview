@@ -1,0 +1,44 @@
+#Change 127.0.0.1 to the IP you want your server to reply on. A single server can have multiple IP addresses.
+<VirtualHost 127.0.0.1:80>
+        ServerName localhost  # the domain name for this site
+
+        # Emergence setup
+        php_value auto_prepend_file "/var/emergence/kernel/bootstrap.php" # this tells php to include this file before anything else, giving control to the Emergence Kernel
+
+        # changed to site root
+        php_value include_path ".:/var/emergence/sites/example" # this tells PHP to look for files to include in the site's directory, allowing us to add third party libraries
+
+        # location of the error log
+        php_value error_log "/var/emergence/sites/example/logs/php.error.log"
+        SetEnv SITE_ID 1
+        SetEnv SITE_ROOT "/var/emergence/sites/example"
+
+        #[ logs ]#
+        # where apache will write the error.log
+        ErrorLog "/var/emergence/sites/example/logs/error.log"
+        
+        # where apache will write the access.log, combined is a predefined style, reference apache2 docs
+        CustomLog "/var/emergence/sites/example/logs/access.log" combined
+        
+        # log output from mod_rewrite, will be empty if RewriteLogLevel is 0
+        RewriteLog "/var/emergence/sites/example/logs/rewrite.log"
+        
+        # for debugging mod_rewrite, use this if you need to write custom rewrites (if you use emergence right, you shouldn't need to)
+        RewriteLogLevel 0
+
+        #[ htdocs ]#
+        DirectoryIndex index.php
+        
+        # changes the site root to the Emergence Kernel code directory (don't worry, the Emergence PHP Kernel sets the current working directory to the site after it's done loading)
+        DocumentRoot "/var/emergence/kernel/root"
+
+        <Directory "/var/emergence/kernel/root">
+                Options SymLinksIfOwnerMatch
+                AllowOverride None
+                Order allow,deny
+                allow from all
+
+                RewriteEngine on
+                RewriteRule ^(.*)       index.php       [L]
+        </Directory>
+</VirtualHost>
