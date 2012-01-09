@@ -50,6 +50,8 @@ class SiteFile
 		{
 			case 'ID':
 				return $this->_record['ID'];
+			case 'Class':
+				return __CLASS__;
 			case 'Handle':
 				return $this->_handle;
 			case 'Type':
