@@ -37,6 +37,8 @@ class SiteCollection
 		{
 			case 'ID':
 				return $this->_record['ID'];
+			case 'Class':
+				return __CLASS__;
 			case 'Handle':
 				return $this->_record['Handle'];
 			case 'Status':
@@ -373,7 +375,31 @@ class SiteCollection
     
     static public function createRecord($handle, $parentCollection = null, $siteID = null)
     {
-    	//DB::nonQuery('LOCK TABLES '.static::$tableName.' WRITE');
+    	// check for existing deleted node
+    	$existingRecord = DB::oneRecord(
+    		'SELECT * FROM `%s` WHERE SiteID = %u AND ParentID = %s AND Handle = "%s"'
+    		,array(
+				static::$tableName
+				,$parentCollection ? $parentCollection->SiteID : ($siteID ? $siteID : Site::getSiteID())
+				,$parentCollection ? $parentCollection->ID : 'NULL'
+				,DB::escape($handle)
+    		)
+    	);
+    	
+    	if($existingRecord)
+    	{
+    		DB::nonQuery(
+    			'UPDATE `%s` SET Status = "Normal" WHERE ID = %u'
+    			,array(
+    				static::$tableName
+    				,$existingRecord['ID']
+    			)
+    		);
+    		
+    		return $existingRecord['ID'];
+    	}
+    
+    	DB::nonQuery('LOCK TABLES '.static::$tableName.' WRITE');
     
 		// determine new node's position
 		$left = $parentCollection ? $parentCollection->PosRight : DB::oneValue('SELECT IFNULL(MAX(`PosRight`)+1,1) FROM `%s`', static::$tableName);
@@ -410,7 +436,7 @@ class SiteCollection
 		));
 		
     	//DB::nonQuery('COMMIT');
-    	//DB::nonQuery('UNLOCK TABLES');
+    	DB::nonQuery('UNLOCK TABLES');
 
 		return DB::insertID();
     }
@@ -460,4 +486,8 @@ class SiteCollection
 		return null;
 	}
 
+	public function getData()
+	{
+		return $this->_record;
+	}
 }

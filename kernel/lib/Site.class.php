@@ -12,7 +12,11 @@ class Site
 	static public $databaseUsername;
 	static public $databasePassword;
 	
-	static public $onNotFound = false;
+	static public $autoCreateSession = true;
+	
+	static public $onInitialized;
+	static public $onNotFound;
+	static public $onRequestMapped;
 	
 
 	// public properties
@@ -93,9 +97,14 @@ class Site
 		// register exception handler
 		set_exception_handler('Site::handleException');
 		
-		// create session
-		$GLOBALS['Session'] = UserSession::getFromRequest();
+		// check virtual system for site config
+		static::loadConfig(__CLASS__);
+		
+		
+		if(is_callable(static::$onInitialized))
+			call_user_func(static::$onInitialized);
 	}
+		
 	
 	static protected function _compileConfiguration()
 	{
@@ -180,23 +189,37 @@ class Site
 
 		}
 		
-		
-		if(!$resolvedNode)
+		if($resolvedNode)
 		{
-			static::respondNotFound();
-		}
-		elseif($resolvedNode->MIMEType == 'application/php')
-		{
-			require($resolvedNode->RealPath);
-			exit();
-		}
-		elseif(!is_callable(array($resolvedNode, 'outputAsResponse')))
-		{
-			throw new Exception('Node does not support rendering');
+			// create session
+			if(static::$autoCreateSession && $resolvedNode->MIMEType == 'application/php')
+			{
+				$GLOBALS['Session'] = UserSession::getFromRequest();
+			}
+
+			if(is_callable(static::$onRequestMapped))
+			{
+				call_user_func(static::$onRequestMapped, $resolvedNode);
+			}
+
+			if($resolvedNode->MIMEType == 'application/php')
+			{
+				require($resolvedNode->RealPath);
+				exit();
+			}
+			elseif(!is_callable(array($resolvedNode, 'outputAsResponse')))
+			{
+				//throw new Exception('Node does not support rendering');
+				static::respondNotFound();
+			}
+			else
+			{
+				$resolvedNode->outputAsResponse();
+			}
 		}
 		else
 		{
-			$resolvedNode->outputAsResponse();
+			static::respondNotFound();
 		}
 	}
 	
@@ -266,15 +289,7 @@ class Site
 		require($classNode->RealPath);	
 
 		// try to load config
-		if($configNode = static::resolvePath("php-config/$className.config.php"))
-		{
-			if(!$configNode->MIMEType == 'application/php')
-			{
-				die('Config file for "'.$className.'" is not application/php');
-			}
-			
-			require($configNode->RealPath);
-		}
+		static::loadConfig($className);
 		
 		// invoke __classLoaded
 		if(method_exists($className, '__classLoaded'))
@@ -284,6 +299,19 @@ class Site
 
 		
 		//Debug::dump($classNode);
+	}
+	
+	static public function loadConfig($className)
+	{
+		if($configNode = static::resolvePath("php-config/$className.config.php"))
+		{
+			if(!$configNode->MIMEType == 'application/php')
+			{
+				die('Config file for "'.$className.'" is not application/php');
+			}
+			
+			require($configNode->RealPath);
+		}
 	}
 	
 	
@@ -310,7 +338,7 @@ class Site
 	
 	static public function respondNotFound($message = 'Page not found')
 	{
-		if(static::$onNotFound)
+		if(is_callable(static::$onNotFound))
 		{
 			call_user_func(static::$onNotFound, $message);
 		}
@@ -388,5 +416,13 @@ class Site
 		
 		header('Location: ' . $url);
 		exit();
+	}
+
+	static public function getPath($index = null)
+	{
+		if($index === null)
+			return static::$requestPath;
+		else
+			return static::$requestPath[$index];
 	}
 }
