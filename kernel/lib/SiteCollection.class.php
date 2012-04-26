@@ -488,6 +488,9 @@ class SiteCollection
 
 	public function getData()
 	{
-		return $this->_record;
+		$data = $this->_record;
+		$data['Class'] = $this->Class;
+		$data['FullPath'] = $this->FullPath;
+		return $data;
 	}
 }

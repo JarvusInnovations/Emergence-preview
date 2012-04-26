@@ -155,7 +155,7 @@ class Site
 
 			while(($handle = array_shift(static::$pathStack)))
 			{
-				$scriptHandle = (strpos($handle,'.')===false) ? $handle.'.php' : false;
+				$scriptHandle = (substr($handle,-4)=='.php') ? $handle : $handle.'.php';
 
 				//printf('%s: (%s)/(%s) - %s<br>', $resolvedNode->Handle, $handle, implode('/',static::$pathStack), $scriptHandle);
 				if(
@@ -331,9 +331,39 @@ class Site
 		die("<h1>Error</h1><p>$errstr</p><p><b>Source:</b> $errfile<br /><b>Line:</b> $errline<br /><b>Author:</b> {$File->Author->Username}<br /><b>Timestamp:</b> ".date('Y-m-d h:i:s', $File->Timestamp)."</p>");
 	}
 	
-	static public function handleException($e)
+	static public function handleException($e, $fatal = true)
 	{
-		die('<h1>Unhandled Exception</h1><p>'.get_class($e).': '.$e->getMessage().'</p><h1>Backtrace:</h1><pre>'.$e->getTraceAsString().'</pre><h1>Exception Dump</h1><pre>'.print_r($e,true).'</pre>');
+		$report = sprintf("<h1 style='color:red'>%s caught</h1>\n", get_class($e));
+		$report .= sprintf("<p>%s</p>\n", htmlspecialchars($e->getMessage()));
+		$report .= sprintf("<h2>Details</h2>\n<pre>%s</pre>\n", print_r($e, true));
+		$report .= sprintf("<h2>URI</h2>\n<p>%s</p>\n", htmlspecialchars($_SERVER['REQUEST_URI']));
+		$report .= sprintf("<h2>_SERVER</h2>\n<pre>%s</pre>\n", print_r($_SERVER, true));
+		
+		if($GLOBALS['Session']->Person)
+		{
+			$report .= sprintf("<h2>User</h2>\n<pre>%s</pre>\n", print_r($GLOBALS['Session']->Person->getData(), true));
+		}
+			
+		$report .= '<h1>Backtrace:</h1><pre>'.$e->getTraceAsString().'</pre>';
+		$report .= '<h2>Debug Log</h2><pre>'.print_r(Debug::$log, true).'</pre>';
+		
+		
+		if(static::$debug)
+		{
+			print($report);
+			
+			if($fatal)
+				exit();
+		}
+		else
+		{
+			Email::send(static::$webmasterEmail, 'Unhandled '.get_class($e).' on '.$_SERVER['HTTP_HOST'], $report);
+			
+			if($fatal)
+				die('There was a problem... our technical staff has been notified. Please retry later.');
+		}
+
+		
 	}
 	
 	static public function respondNotFound($message = 'Page not found')
@@ -417,6 +447,12 @@ class Site
 		header('Location: ' . $url);
 		exit();
 	}
+	
+	static public function redirectPermanent($path, $get = false, $hash = false)
+	{
+		header('HTTP/1.1 301 Moved Permanently');
+		return static::redirect($path, $get, $hash);
+	}
 
 	static public function getPath($index = null)
 	{
@@ -424,5 +460,10 @@ class Site
 			return static::$requestPath;
 		else
 			return static::$requestPath[$index];
+	}
+
+	static public function matchPath($index, $string)
+	{
+		return 0==strcasecmp(static::getPath($index), $string);
 	}
 }

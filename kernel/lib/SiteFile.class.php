@@ -367,4 +367,12 @@ class SiteFile
 		return $this->MIMEType;
     }
 
+
+	public function getData()
+	{
+		$data = $this->_record;
+		$data['Class'] = $this->Class;
+		$data['FullPath'] = $this->FullPath;
+		return $data;
+	}
 }
